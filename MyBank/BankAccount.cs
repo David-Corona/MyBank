@@ -29,12 +29,19 @@ namespace MyBank
 
         private List<Transaction> allTransactions = new List<Transaction>();
 
-        public BankAccount(string name, decimal initialBalance)
+        private readonly decimal minimumBalance;
+
+        public BankAccount(string name, decimal initialBalance) : this(name, initialBalance, 0) { } // this calls the other constructor
+
+        public BankAccount(string name, decimal initialBalance, decimal minimumBalance)
         {
-            Owner = name;
             Number = accountNumberSeed.ToString();
             accountNumberSeed++;
-            MakeDeposit(initialBalance, DateTime.Now, "Initial balance");
+
+            Owner = name;
+            this.minimumBalance = minimumBalance;
+            if (initialBalance > 0)
+                MakeDeposit(initialBalance, DateTime.Now, "Initial balance");
         }
 
         public void MakeDeposit(decimal amount, DateTime date, string note)
@@ -53,12 +60,23 @@ namespace MyBank
             {
                 throw new ArgumentOutOfRangeException(nameof(amount), "Amount of withdrawal must be positive");
             }
-            if (Balance - amount < 0)
+            Transaction? overdraftTransaction = CheckWithdrawalLimit(Balance - amount < minimumBalance);
+            Transaction? withdrawal = new(-amount, date, note);
+            allTransactions.Add(withdrawal);
+            if (overdraftTransaction != null)
+                allTransactions.Add(overdraftTransaction);
+        }
+
+        protected virtual Transaction? CheckWithdrawalLimit(bool isOverdrawn)
+        {
+            if (isOverdrawn)
             {
                 throw new InvalidOperationException("Not sufficient funds for this withdrawal");
             }
-            var withdrawal = new Transaction(-amount, date, note);
-            allTransactions.Add(withdrawal);
+            else
+            {
+                return default;
+            }
         }
 
         public string GetAccountHistory()
@@ -75,6 +93,8 @@ namespace MyBank
 
             return report.ToString();
         }
+
+        public virtual void PerformMonthEndTransactions() { }
 
     }
 }
